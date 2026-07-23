@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Developer Application Portal</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- Firebase App & Database Compat SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: #121212;
+            color: #ffffff;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #galaxy-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+
+        .portal-card {
+            background-color: #383838;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 450px;
+            max-height: 85vh;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .header {
+            text-align: center;
+            padding: 30px 20px 20px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 800;
+            margin-bottom: 5px;
+            color: #e50914;
+            letter-spacing: 1px;
+        }
+
+        .header p {
+            font-size: 13px;
+            color: #b0b0b0;
+        }
+
+        .form-container {
+            padding: 20px 30px 30px 30px;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
+        .form-container::-webkit-scrollbar { width: 5px; }
+        .form-container::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.1); border-radius: 10px; margin: 10px 0; }
+        .form-container::-webkit-scrollbar-thumb { background: #888; border-radius: 10px; }
+        .form-container::-webkit-scrollbar-thumb:hover { background: #aaa; }
+
+        .form-group { margin-bottom: 18px; position: relative; }
+        .form-group label { display: block; font-size: 11px; font-weight: 700; color: #e0e0e0; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .form-control { width: 100%; padding: 14px 16px; border-radius: 8px; border: none; background-color: #f4f4f4; color: #333333; font-size: 14px; font-weight: 500; outline: none; transition: all 0.3s; }
+        .form-control:focus { box-shadow: 0 0 0 2px #e50914; }
+        .form-control::placeholder { color: #888888; font-weight: normal; }
+        textarea.form-control { resize: none; height: 80px; }
+        select.form-control { cursor: pointer; appearance: none; -webkit-appearance: none; }
+
+        .dropdown-menu { display: none; position: absolute; top: 100%; left: 0; width: 100%; background-color: #f4f4f4; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); z-index: 50; margin-top: 5px; overflow: hidden; }
+        .dropdown-menu.show { display: block; }
+        .dropdown-search { width: 100%; padding: 12px; border: none; border-bottom: 1px solid #ddd; background-color: #ffffff; color: #333; font-size: 14px; outline: none; }
+        .dropdown-list { max-height: 160px; overflow-y: auto; }
+        .dropdown-item { padding: 12px 16px; color: #333; font-size: 14px; cursor: pointer; transition: background 0.2s; }
+        .dropdown-item:hover { background-color: #e0e0e0; }
+
+        .checkbox-group { display: flex; align-items: flex-start; margin-top: 10px; margin-bottom: 20px; }
+        .checkbox-group input { width: 16px; height: 16px; margin-right: 10px; margin-top: 2px; cursor: pointer; }
+        .checkbox-group label { font-size: 13px; color: #cccccc; cursor: pointer; line-height: 1.4; }
+
+        .submit-btn { width: 100%; padding: 16px; background-color: #e50914; color: #ffffff; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; transition: background 0.3s, transform 0.1s; }
+        .submit-btn:hover { background-color: #f6121d; }
+        .submit-btn:active { transform: scale(0.98); }
+
+        #success-screen {
+            display: none;
+            text-align: center;
+            padding: 40px 20px;
+        }
+        
+        .success-icon {
+            width: 70px;
+            height: 70px;
+            background-color: #28a745;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px auto;
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        .success-icon svg {
+            width: 35px;
+            height: 35px;
+            stroke-dasharray: 50;
+            stroke-dashoffset: 50;
+            animation: drawTick 0.5s ease-out 0.3s forwards;
+        }
+
+        #success-screen h2 {
+            font-size: 20px;
+            font-weight: bold;
+            color: #ffffff;
+            margin-bottom: 12px;
+            opacity: 0;
+            animation: fadeIn 0.5s ease-out 0.6s forwards;
+        }
+
+        #success-screen p {
+            font-size: 13px;
+            color: #999999;
+            opacity: 0;
+            animation: fadeIn 0.5s ease-out 0.8s forwards;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0); }
+            100% { transform: scale(1); }
+        }
+        @keyframes drawTick {
+            0% { stroke-dashoffset: 50; }
+            100% { stroke-dashoffset: 0; }
+        }
+        @keyframes fadeIn {
+            0% { opacity: 0; transform: translateY(10px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="galaxy-canvas"></canvas>
+
+    <div class="portal-card">
+        <div class="header" id="form-header">
+            <h1>WINDS-APPLY</h1>
+            <p>Please enter details to submit your application</p>
+        </div>
+
+        <div class="form-container" id="scroll-container">
+            
+            <form id="application-form">
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="name" class="form-control" placeholder="Enter Full Name">
+                </div>
+
+                <div class="form-group">
+                    <label>Age (Years)</label>
+                    <input type="number" id="age" class="form-control" placeholder="Enter Age" min="10" max="100">
+                </div>
+
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="email" class="form-control" placeholder="Enter Email Address">
+                </div>
+
+                <div class="form-group">
+                    <label>Location / Country</label>
+                    <input type="text" id="country-input" class="form-control" placeholder="Select or search country..." readonly style="cursor: pointer;">
+                    
+                    <div class="dropdown-menu" id="country-dropdown">
+                        <input type="text" id="country-search" class="dropdown-search" placeholder="Type country name...">
+                        <div class="dropdown-list" id="country-list"></div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>What work you have? <span style="text-transform: lowercase; font-weight: normal; color: #999;">(optional)</span></label>
+                    <select id="workType" class="form-control">
+                        <option value="" disabled selected>Select Work Track</option>
+                        <option value="Want a website">Want a website</option>
+                        <option value="Want to create a game">Want to create a game</option>
+                        <option value="Want to create App">Want to create App</option>
+                        <option value="Want to host a web/bot">Want to host a web/bot</option>
+                        <option value="Want a bot">Want a bot</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Why do you choose us?</label>
+                    <textarea id="whyChooseUs" class="form-control" placeholder="Write your reason here..."></textarea>
+                </div>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="terms">
+                    <label for="terms">Do you agree to our all terms and policies?</label>
+                </div>
+
+                <button type="submit" class="submit-btn">Submit Application</button>
+            </form>
+
+            <div id="success-screen">
+                <div class="success-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                </div>
+                <h2>Your Application Was Successfully Added.</h2>
+                <p>You may got reply via email in 24/7</p>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Firebase SDK & Custom Validation -->
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCa0A0fuxJ-DbbTi6wrk0ts2UU_hHdT5SI",
+            authDomain: "adminofsw.firebaseapp.com",
+            databaseURL: "https://adminofsw-default-rtdb.firebaseio.com", 
+            projectId: "adminofsw",
+            storageBucket: "adminofsw.appspot.com",
+            messagingSenderId: "351370839445",
+            appId: "1:351370839445:web:a5efcd12e6841ae558a29c",
+            measurementId: "G-70J5Y5F519"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        const form = document.getElementById('application-form');
+        const scrollContainer = document.getElementById('scroll-container');
+
+        form.addEventListener('submit', function(event) {
+            event.preventDefault(); 
+
+            const name = document.getElementById('name').value.trim();
+            const age = document.getElementById('age').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const country = document.getElementById('country-input').value.trim();
+            const workType = document.getElementById('workType').value;
+            const whyChooseUs = document.getElementById('whyChooseUs').value.trim();
+            const terms = document.getElementById('terms').checked;
+
+            if (!name) { alert("Please enter your Full Name!"); document.getElementById('name').focus(); scrollContainer.scrollTop = 0; return; }
+            if (!age) { alert("Please enter your Age!"); document.getElementById('age').focus(); return; }
+            if (!email) { alert("Please enter your Email Address!"); document.getElementById('email').focus(); return; }
+            if (!country) { alert("Please select your Location/Country!"); return; }
+            if (!whyChooseUs) { alert("Please write 'Why do you choose us?'"); document.getElementById('whyChooseUs').focus(); return; }
+            if (!terms) { alert("Please check the Terms and Policies box at the bottom!"); return; }
+
+            const submitBtn = document.querySelector('.submit-btn');
+            submitBtn.innerText = "Submitting...";
+            submitBtn.style.opacity = "0.7";
+            submitBtn.disabled = true;
+            
+            const timestamp = new Date().toLocaleString();
+
+            try {
+                db.ref('applications/').push({
+                    name,
+                    age,
+                    email,
+                    country,
+                    workType,
+                    whyChooseUs,
+                    timestamp
+                });
+
+                setTimeout(() => {
+                    document.getElementById('form-header').style.display = 'none';
+                    form.style.display = 'none';
+                    document.getElementById('success-screen').style.display = 'block';
+                }, 1000);
+
+            } catch (error) {
+                alert("Firebase Error: " + error.message);
+                submitBtn.innerText = "Submit Application";
+                submitBtn.style.opacity = "1";
+                submitBtn.disabled = false;
+            }
+        });
+    </script>
+
+    <!-- Three.js and Dropdown Logic -->
+    <script>
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('galaxy-canvas'), antialias: true });
+
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        const particleCount = 1000;
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(particleCount * 3);
+
+        for (let i = 0; i < particleCount * 3; i += 3) {
+            positions[i] = (Math.random() - 0.5) * 300;
+            positions[i + 1] = (Math.random() - 0.5) * 300;
+            positions[i + 2] = (Math.random() - 0.5) * 300;
+        }
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+        function createStarTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 32;
+            canvas.height = 32;
+            const ctx = canvas.getContext('2d');
+            const gradient = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+            gradient.addColorStop(0, 'rgba(255,255,255,1)');
+            gradient.addColorStop(0.2, 'rgba(255,255,255,0.8)');
+            gradient.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(16, 16, 16, 0, Math.PI * 2);
+            ctx.fill();
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        const material = new THREE.PointsMaterial({
+            size: 2.5,
+            map: createStarTexture(),
+            transparent: true,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+        });
+
+        const stars = new THREE.Points(geometry, material);
+        scene.add(stars);
+        camera.position.z = 100;
+
+        let time = 0;
+        function animate() {
+            requestAnimationFrame(animate);
+            time += 0.0005;
+            stars.rotation.y = time; 
+            stars.rotation.x = time * 0.5;
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        const countries = [
+            "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan",
+            "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria", "Burkina Faso", "Burundi",
+            "Cambodia", "Cameroon", "Canada", "Cape Verde", "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros", "Congo", "Costa Rica", "Croatia", "Cuba", "Cyprus", "Czech Republic",
+            "Denmark", "Djibouti", "Dominica", "Dominican Republic",
+            "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia",
+            "Fiji", "Finland", "France",
+            "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece", "Grenada", "Guatemala", "Guinea", "Guyana",
+            "Haiti", "Honduras", "Hungary",
+            "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland", "Israel", "Italy",
+            "Jamaica", "Japan", "Jordan",
+            "Kazakhstan", "Kenya", "Kiribati", "Kuwait", "Kyrgyzstan",
+            "Laos", "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg",
+            "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Mauritania", "Mauritius", "Mexico", "Micronesia", "Moldova", "Monaco", "Mongolia", "Montenegro", "Morocco", "Mozambique", "Myanmar",
+            "Namibia", "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua", "Niger", "Nigeria", "North Korea", "North Macedonia", "Norway",
+            "Oman",
+            "Pakistan", "Palau", "Palestine", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland", "Portugal",
+            "Qatar",
+            "Romania", "Russia", "Rwanda",
+            "Saint Kitts and Nevis", "Saint Lucia", "Saint Vincent and the Grenadines", "Samoa", "San Marino", "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", "Slovenia", "Solomon Islands", "Somalia", "South Africa", "South Korea", "South Sudan", "Spain", "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland", "Syria",
+            "Taiwan", "Tajikistan", "Tanzania", "Thailand", "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia", "Turkey", "Turkmenistan", "Tuvalu",
+            "Uganda", "Ukraine", "United Arab Emirates", "United Kingdom", "United States", "Uruguay", "Uzbekistan",
+            "Vanuatu", "Vatican City", "Venezuela", "Vietnam",
+            "Yemen",
+            "Zambia", "Zimbabwe"
+        ];
+
+        const countryInput = document.getElementById('country-input');
+        const countryDropdown = document.getElementById('country-dropdown');
+        const countrySearch = document.getElementById('country-search');
+        const countryList = document.getElementById('country-list');
+
+        function renderCountries(filter = "") {
+            countryList.innerHTML = "";
+            const filtered = countries.filter(c => c.toLowerCase().includes(filter.toLowerCase()));
+            if (filtered.length === 0) {
+                countryList.innerHTML = `<div style="padding: 12px; color: #888; font-size: 14px;">No country found</div>`;
+                return;
+            }
+            filtered.forEach(country => {
+                const div = document.createElement('div');
+                div.className = "dropdown-item";
+                div.textContent = country;
+                div.onclick = () => {
+                    countryInput.value = country;
+                    countryDropdown.classList.remove('show');
+                };
+                countryList.appendChild(div);
+            });
+        }
+
+        countryInput.onclick = (e) => {
+            e.stopPropagation();
+            const isShowing = countryDropdown.classList.contains('show');
+            if(!isShowing) {
+                countryDropdown.classList.add('show');
+                countrySearch.value = "";
+                renderCountries();
+                countrySearch.focus();
+            } else {
+                countryDropdown.classList.remove('show');
+            }
+        };
+
+        countrySearch.oninput = (e) => {
+            renderCountries(e.target.value);
+        };
+
+        window.onclick = (e) => {
+            if (!e.target.matches('#country-input') && !e.target.closest('#country-dropdown')) {
+                countryDropdown.classList.remove('show');
+            }
+        };
+    </script>
+</body>
+</html>
